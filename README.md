@@ -5,33 +5,31 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
 ---
-## Instrucciones - Ejercicio 3
-Para hacer el test se levanta un container con Docker que ejecutará el siguiente script:
-```bash
-#!/bin/sh
+## Instrucciones - Ejercicio 4
 
-response=$(echo "PING" | nc server $SERVER_PORT)
+En este ejercicio se implementó la salida gracefully tanto del cliente como del servidor. En ese sentido, si es atrapada una señal de SIGTERM tanto el servidor como el cliente intentarán cerrar de manera ordenada, sin dejar fd's abiertos.
 
-if [ "$response" == "PING" ]; then
-	echo "Test passed"
-else
-	echo "Test failed"
-fi
-```
 
-Para ejecutarlo se provee una entrada en el archivo Makefile `test-netcat`
+##### Servidor
+En el servidor, usando la biblioteca `signal` se implementa un handler de la señal `__stop` el cual cambia el valor del flag del loop y cierra el socket del servidor (el que fue bindeado y del que posiblemente se esté esperando una conexión para hacer accept).
+
+En caso de que el servidor esté esperando una nueva conexión, se atrapa la excepción que levantará la función bloqueante `socket.accept` devolviendo una conexión inválida y finalizando el loop.
+
+En caso de que el servidor esté actualmente procesando la solicitud de un cliente se cierra únicamente el 'listening socket', por lo que se esperará hasta terminar de procesar la solicitud del cliente y luego se cerrará. Se tomó esta decisión ya que las peticiones por lo general no son temporalmente pesadas.
+
+Se agregó en el Makefile un atajo para enviar al servidor la señal de SIGTERM.
 ```sh
-make test-netcat
+make kill_server
+> docker kill --signal=15 server
 ```
 
-Que simplemente realiza:
-```Makefile
-test-netcat:
-	docker build -f ./test/Dockerfile -t test-image .
-	docker run --rm --network tp0_testing_net --env-file ./test/config.txt --name test-container test-image
-```
+##### Cliente
+En el caso del cliente se utiliza un canal por el que se notificará la llegada de la señal SIGTERM. Se finaliza el loop cerrando dicho canal y el socket ordenadamente.
 
-En `test/config.txt` se puede cambiar el puerto del servidor que se levantará como una variable de ambiente en la imagen de docker.
+Por ejemplo, para enviar una señal de SIGTERM al cliente 1 se puede usar el siguiente comando:
+```sh
+docker kill --signal=15 client1
+```
 
 ---
 
