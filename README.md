@@ -4,6 +4,17 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
+---
+## Instrucciones - Ejercicio 1.1
+El script solicitado se encuentra en 'set_up_docker_compose.py'.
+La ejecución es muy sencilla, por ejemplo si se quiere una configuración con 3 clientes simplemente se ejecuta:
+```sh
+python3 set_up_docker_compose.py 3
+```
+Este script generará la configuración que es volcada en el archivo 'docker-compose-dev.yaml'
+
+---
+
 ## Instrucciones de uso
 El repositorio cuenta con un **Makefile** que posee encapsulado diferentes comandos utilizados recurrentemente en el proyecto en forma de targets. Los targets se ejecutan mediante la invocación de:
 
