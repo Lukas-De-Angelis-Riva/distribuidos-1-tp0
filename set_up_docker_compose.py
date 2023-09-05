@@ -9,6 +9,7 @@ def info_server():
         'image': 'server:latest',
         'entrypoint': 'python3 /main.py',
         'environment': ['PYTHONUNBUFFERED=1', 'LOGGING_LEVEL=DEBUG'],
+        'volumes': ['./server/config.ini:/config.ini'],
         'networks': ['testing_net'],
     }
 
@@ -19,6 +20,7 @@ def info_client(id):
         'image': 'client:latest',
         'entrypoint': '/client',
         'environment': [f'CLI_ID={id}', 'CLI_LOG_LEVEL=DEBUG'],
+        'volumes': ['./client/config.yaml:/config.yaml'],
         'networks': ['testing_net'],
         'depends_on': ['server'],
     }
