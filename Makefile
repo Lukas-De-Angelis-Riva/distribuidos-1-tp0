@@ -37,3 +37,7 @@ docker-compose-down:
 docker-compose-logs:
 	docker compose -f docker-compose-dev.yaml logs -f
 .PHONY: docker-compose-logs
+
+test-netcat:
+	docker build -f ./test/Dockerfile -t test-image .
+	docker run --rm --network tp0_testing_net --env-file ./test/config.txt --name test-container test-image
