@@ -5,7 +5,33 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
 ---
-## Instrucciones - Ejercicio 2
+## Instrucciones - Ejercicio 3
+Para hacer el test se levanta un container con Docker que ejecutará el siguiente script:
+```bash
+#!/bin/sh
+
+response=$(echo "PING" | nc server $SERVER_PORT)
+
+if [ "$response" == "PING" ]; then
+	echo "Test passed"
+else
+	echo "Test failed"
+fi
+```
+
+Para ejecutarlo se provee una entrada en el archivo Makefile `test-netcat`
+```sh
+make test-netcat
+```
+
+Que simplemente realiza:
+```Makefile
+test-netcat:
+	docker build -f ./test/Dockerfile -t test-image .
+	docker run --rm --network tp0_testing_net --env-file ./test/config.txt --name test-container test-image
+```
+
+En `test/config.txt` se puede cambiar el puerto del servidor que se levantará como una variable de ambiente en la imagen de docker.
 
 ---
 
