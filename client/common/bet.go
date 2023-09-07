@@ -8,6 +8,15 @@ type Bet struct {
 	Number        string
 }
 
+// Crea una apuesta a partir de un record
+// el record debe ser una lista de 5 elementos
+// ordenados segun:
+// * Nombre
+// * Apellido
+// * Documento
+// * Fecha de nacimiento
+// * Numero
+// Tal cual aparecen en los archivos de datos.
 func fromRecord(record []string) Bet {
 	return Bet {
 		Name: record[0],

@@ -29,11 +29,14 @@ const ERROR = -1
 const WAIT = 0
 const INFO = 1
 
+// Entidad que maneja la comunicacion con el centro de loteria nacional
 type NationalLotteryCenter struct {
     conn net.Conn 
     ID string
 }
 
+// Crea el comunicador con la central. genera un socket tcp/ip
+//  con el que se comunicara con el servidor
 func NewNationalLotteryCenter(ID string, ServerAddress string) *NationalLotteryCenter {
     conn, err := net.Dial("tcp", ServerAddress)
     if err != nil {
@@ -52,6 +55,11 @@ func NewNationalLotteryCenter(ID string, ServerAddress string) *NationalLotteryC
     return center
 }
 
+// Envia todos los bytes en data por la conexióon conn.
+// Previene las anomalias de short-write
+//
+// Si no hay error se devuelve nil, en caso de error
+//  este es devuelto
 func sendData(conn net.Conn, data []byte) error {
     for totalSent := 0; totalSent < len(data); {
         sent, err := conn.Write(data[totalSent:])
@@ -64,6 +72,10 @@ func sendData(conn net.Conn, data []byte) error {
     return nil
 }
 
+// Serializa un campo string a bytes, y por delante pone
+//  el indicador del tipo siguiente el protocolo TLV propuesto
+//
+// Devuelve los bytes serializados
 func serializeString(field_type byte, field string) []byte {
     serialized := []byte{}
     serialized = append(serialized, field_type)
@@ -75,6 +87,8 @@ func serializeString(field_type byte, field string) []byte {
     return append(serialized, []byte(field)...)
 }
 
+// Serializa por completo una apuesta, utilizando el protocolo TLV propuesto
+// El orden de los campos no interesa
 func (p *NationalLotteryCenter) serializeBet(bet Bet) []byte {
     serialized := []byte{}
     serialized = append(serialized, serializeString(AGENCY_NAME_TYPE, p.ID)...)
@@ -94,6 +108,12 @@ func (p *NationalLotteryCenter) serializeBet(bet Bet) []byte {
     return data
 }
 
+// Envia una apuesta a traves del socket de comunicacion
+// 
+// La apuesta es serializada segun el protocolo TLV propuesto y enviada
+//  por completo a traves del socket-
+//
+// Si no hay error se devuelve nil, en caso de error se devuelve este
 func (p *NationalLotteryCenter) sendBet(bet Bet) error {
     data := p.serializeBet(bet)
     err := sendData(p.conn, data)
@@ -105,6 +125,10 @@ func (p *NationalLotteryCenter) sendBet(bet Bet) error {
     return nil
 }
 
+// Envia un conjunto de apuestas conjuntamente a traves
+//  del socket de comunicacion
+// El envio se hace en conjunto, es decir los datos se envian
+//  uno tras otro en un tira de bits simultaneamente
 func (p *NationalLotteryCenter) sendBatch(batch []Bet) error {
     first_part := []byte{}
     // Se envia el indicador
@@ -125,6 +149,10 @@ func (p *NationalLotteryCenter) sendBatch(batch []Bet) error {
     return sendData(p.conn, data)
 }
 
+// Lee una cantidad especifica de bytes de un socket
+// Evita anomalias de short-read
+//
+// En caso de error se devuelve
 func readAll(conn net.Conn, bytesToRead int) ([]byte, error) {
 
     bytesReaded := 0
@@ -140,7 +168,10 @@ func readAll(conn net.Conn, bytesToRead int) ([]byte, error) {
     return data, nil
 }
 
-
+// Lee del socket un byte a la espera de la confirmacion
+// 
+// Si ocurre un error en la lectura o  no se leyo lo esperado,
+//  se devuelve un error.
 func (p *NationalLotteryCenter) waitConfirmation() error {
 
     confirmation, err := readAll(p.conn, 1) // leer el tipo
@@ -155,7 +186,8 @@ func (p *NationalLotteryCenter) waitConfirmation() error {
     }
 }
 
-
+// Envia por el socket el byte correspondiente a cortar la comunicacion
+//  segun lo establecido en el protocolo TLV propuesto
 func (p *NationalLotteryCenter) Finish() error {
     goodbye := []byte{}
     goodbye = append(goodbye, FINISH_TYPE)
@@ -165,10 +197,15 @@ func (p *NationalLotteryCenter) Finish() error {
 
 }
 
+// Cierra la conexion con el servidor
 func (p *NationalLotteryCenter) Close() {
     p.conn.Close()
 }
 
+// Lee del socket un documento. Dicho documento sera devuelto como
+//  el primer elemento si no ocurre un error.
+// 
+// Si ocurre algun error sera devuelto como el segundo elemento
 func (p *NationalLotteryCenter) ReadDocument() (string, error) {
     tlv_type, err := readAll(p.conn, 1) // leo el tipo
     if err != nil {
@@ -195,6 +232,10 @@ func (p *NationalLotteryCenter) ReadDocument() (string, error) {
     }
 }
 
+// Lee a los ganadores del sorteo a traves del socket.
+// Devuelve dichos ganadores como una lista de strings (los documentos)
+// 
+// En caso de error sera devuelto como segundo elemento
 func (p *NationalLotteryCenter) ReadWinners() ([]string, error) {
     amount_d, err := readAll(p.conn, 4) // leer el int: cantidad de ganadores
     if err != nil {
@@ -218,6 +259,14 @@ func (p *NationalLotteryCenter) ReadWinners() ([]string, error) {
     return winners, nil
 }
 
+// Realiza un poll hacia el servidor y se queda esperando la respuesta
+// El tipo de respuesta sera devuelto como primer elemento
+//  * INFO: hay ganadores
+//  * WAIT: aun no se realizo el sorteo
+//  * ERROR: ocurrio un error realizando el poll
+// Si hay ganadores seran devueltos como el segundo elemento.
+//
+// En caso de error sera devuelto como tercer elemento
 func (p *NationalLotteryCenter) PollWinners() (int, []string, error){
     poll_req := []byte{}
     poll_req = append(poll_req, POLL_TYPE)

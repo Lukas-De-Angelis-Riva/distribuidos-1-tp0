@@ -9,7 +9,7 @@ import (
     log "github.com/sirupsen/logrus"
 )
 
-// ClientConfig Configuration used by the client
+// ClientConfig Configuracion usada por el cliente
 type ClientConfig struct {
     ID            string
     ServerAddress string
@@ -17,14 +17,14 @@ type ClientConfig struct {
     BatchSize     uint
 }
 
-// Client Entity that encapsulates how
+// Client entidad que lo encapsula
 type Client struct {
     config ClientConfig
     center *NationalLotteryCenter
 }
 
-// NewClient Initializes a new client receiving the configuration
-// as a parameter
+// NewClient inicializa un nuevo cliente, recibiendo la
+// configuracion como parametro
 func NewClient(config ClientConfig) *Client {
     client := &Client{
         config: config,
@@ -32,6 +32,11 @@ func NewClient(config ClientConfig) *Client {
     return client
 }
 
+// Run realiza la logica del cliente
+// Primero recorre el archivo de apuestas y
+//  envia mediante chunks las apuestas al servidor
+// Luego, una vez terminado se empieza a realizar
+//  el poll al servidor para obtener los ganadores
 func (c *Client) Run () {
     err := c.StartClientLoop()
     if err != nil {
@@ -44,6 +49,17 @@ func (c *Client) Run () {
     }
 }
 
+// CheckWinners es la funcion que hace loop realizando
+//  poll al servidor hasta obtener los ganadores
+//
+// Segun la logica propuesta, se genera una conexion
+//  con el servidor, este puede contestar:
+//  * Aun no se encuentra hecho el sorteo, en dicho caso
+//      se frena la ejecución durante un tiempo determinado por
+//      un exponential backoff segun cuantas veces se haya
+//      rechazado la solicitud desde el servidor
+//  * Ya se encuentra hecho el sorteo, en dicho caso
+//      se reciben los documentos de los ganadores del sorteo. 
 func (c *Client) CheckWinners() error {
     log.Infof("action: consulta_ganadores | result: starting")
 
@@ -56,7 +72,7 @@ func (c *Client) CheckWinners() error {
         status, winners, err := c.center.PollWinners()
 
         if err != nil {
-            // log mal ahi
+            log.Fatalf("action: polling | result: fail | error: %v", err)
             c.center.Close()
             return err
         }
@@ -76,7 +92,11 @@ func (c *Client) CheckWinners() error {
     return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
+// StartClientLoop es la funcion que lee el archivo y envia
+//  utilizando chunks las apuestas al servidor.
+// Se genera una conexion con el servidor y una vez establecida
+//  se comienza a leer el archivo csv completando los llamados chunks
+//  que no son mas que tiras de apuestas que se envian en conjunto
 func (c *Client) StartClientLoop() error {
     c.center = NewNationalLotteryCenter(c.config.ID, c.config.ServerAddress)
 
