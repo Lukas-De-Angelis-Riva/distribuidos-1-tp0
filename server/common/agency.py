@@ -7,12 +7,13 @@ from common.utils import store_bets, load_bets, has_won
 from common.counter import Counter
 
 class Agency(threading.Thread):
-    def __init__(self, client_sock, bets_file_lock: threading.Lock, processed_agencies: Counter, processed_agencies_lock: threading.Lock):
+    def __init__(self, client_sock, bets_file_lock: threading.Lock, processed_agencies: Counter, processed_agencies_lock: threading.Lock, number_of_agencies: int):
         threading.Thread.__init__(self)
         self.client_sock = client_sock
         self.bets_file_lock = bets_file_lock
         self.processed_agencies = processed_agencies
         self.processed_agencies_lock = processed_agencies_lock
+        self.number_of_agencies = number_of_agencies
 
     def run(self):
         """
@@ -42,7 +43,7 @@ class Agency(threading.Thread):
 
                     self.processed_agencies_lock.acquire()
                     self.processed_agencies.inc()
-                    if not self.processed_agencies.less_than(5):
+                    if not self.processed_agencies.less_than(self.number_of_agencies):
                         logging.info(f"action: sorteo | result: success")
                     self.processed_agencies_lock.release()
                     break
@@ -51,7 +52,7 @@ class Agency(threading.Thread):
                     agency_number = data
 
                     self.processed_agencies_lock.acquire()
-                    should_wait = self.processed_agencies.less_than(5)
+                    should_wait = self.processed_agencies.less_than(self.number_of_agencies)
                     self.processed_agencies_lock.release()
 
                     if not should_wait:

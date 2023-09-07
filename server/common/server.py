@@ -6,11 +6,13 @@ import threading
 from common.agency import Agency
 from common.counter import Counter
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, number_of_agencies):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+
+        self.number_of_agencies = number_of_agencies
 
         self._keep_running = True
         signal.signal(signal.SIGTERM, self.__stop)
@@ -53,7 +55,7 @@ class Server:
             client_sock = self.__accept_new_connection()
             if client_sock:
                 agency = Agency(client_sock, self.bets_file_lock,
-                    self.processed_agencies, self.processed_agencies_lock)
+                    self.processed_agencies, self.processed_agencies_lock, self.number_of_agencies)
                 agency.start()
                 agencies.append(agency)
 

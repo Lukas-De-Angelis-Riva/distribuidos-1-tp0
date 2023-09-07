@@ -3,12 +3,14 @@ import yaml
 import argparse
 
 
-def info_server():
+def info_server(n_clients):
     return {
         'container_name': 'server',
         'image': 'server:latest',
         'entrypoint': 'python3 /main.py',
-        'environment': ['PYTHONUNBUFFERED=1', 'LOGGING_LEVEL=DEBUG'],
+        'environment': ['PYTHONUNBUFFERED=1',
+                        'LOGGING_LEVEL=DEBUG',
+                        f'AGENCIES={n_clients}'],
         'volumes': ['./server/config.ini:/config.ini'],
         'networks': ['testing_net'],
     }
@@ -48,7 +50,7 @@ def create_file(n_clients):
     config['version'] = '3.9'
     config['name'] = 'tp0'
     config['services'] = {}
-    config['services']['server'] = info_server()
+    config['services']['server'] = info_server(n_clients)
     for i in range(n_clients):
         config['services'][f'client{i+1}'] = info_client(i+1)
     config['networks'] = {}
