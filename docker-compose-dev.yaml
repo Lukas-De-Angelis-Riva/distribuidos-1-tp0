@@ -14,16 +14,14 @@ services:
     environment:
     - CLI_ID=1
     - CLI_LOG_LEVEL=DEBUG
-    - CLI_NAME=LUKAS NAHUEL
-    - CLI_SURNAME=DE ANGELIS RIVA
-    - CLI_DOCUMENT=42340222
-    - CLI_BIRTHDATE=2000-01-06
-    - CLI_NUMBER=91218
+    - CLI_BETS_FILE=agency-1.csv
+    - CLI_BETS_BATCH_SIZE=50
     image: client:latest
     networks:
     - testing_net
     volumes:
     - ./client/config.yaml:/config.yaml
+    - ./.data/agency-1.csv:/agency-1.csv
   client2:
     container_name: client2
     depends_on:
@@ -32,16 +30,14 @@ services:
     environment:
     - CLI_ID=2
     - CLI_LOG_LEVEL=DEBUG
-    - CLI_NAME=KEVIN
-    - CLI_SURNAME=DE ANGELIS RIVA
-    - CLI_DOCUMENT=44340223
-    - CLI_BIRTHDATE=2002-10-15
-    - CLI_NUMBER=1234
+    - CLI_BETS_FILE=agency-2.csv
+    - CLI_BETS_BATCH_SIZE=100
     image: client:latest
     networks:
     - testing_net
     volumes:
     - ./client/config.yaml:/config.yaml
+    - ./.data/agency-2.csv:/agency-2.csv
   client3:
     container_name: client3
     depends_on:
@@ -50,16 +46,14 @@ services:
     environment:
     - CLI_ID=3
     - CLI_LOG_LEVEL=DEBUG
-    - CLI_NAME=KIARA LAURA
-    - CLI_SURNAME=DE ANGELIS RIVA
-    - CLI_DOCUMENT=45131002
-    - CLI_BIRTHDATE=2004-04-15
-    - CLI_NUMBER=9941
+    - CLI_BETS_FILE=agency-3.csv
+    - CLI_BETS_BATCH_SIZE=150
     image: client:latest
     networks:
     - testing_net
     volumes:
     - ./client/config.yaml:/config.yaml
+    - ./.data/agency-3.csv:/agency-3.csv
   client4:
     container_name: client4
     depends_on:
@@ -68,16 +62,14 @@ services:
     environment:
     - CLI_ID=4
     - CLI_LOG_LEVEL=DEBUG
-    - CLI_NAME=DIEGO
-    - CLI_SURNAME=DE ANGELIS
-    - CLI_DOCUMENT=22000112
-    - CLI_BIRTHDATE=1971-06-20
-    - CLI_NUMBER=8188
+    - CLI_BETS_FILE=agency-4.csv
+    - CLI_BETS_BATCH_SIZE=200
     image: client:latest
     networks:
     - testing_net
     volumes:
     - ./client/config.yaml:/config.yaml
+    - ./.data/agency-4.csv:/agency-4.csv
   client5:
     container_name: client5
     depends_on:
@@ -86,16 +78,14 @@ services:
     environment:
     - CLI_ID=5
     - CLI_LOG_LEVEL=DEBUG
-    - CLI_NAME=VIRGINIA LAURA
-    - CLI_SURNAME=RIVA
-    - CLI_DOCUMENT=23123456
-    - CLI_BIRTHDATE=1972-12-12
-    - CLI_NUMBER=1212
+    - CLI_BETS_FILE=agency-5.csv
+    - CLI_BETS_BATCH_SIZE=250
     image: client:latest
     networks:
     - testing_net
     volumes:
     - ./client/config.yaml:/config.yaml
+    - ./.data/agency-5.csv:/agency-5.csv
   server:
     container_name: server
     entrypoint: python3 /main.py

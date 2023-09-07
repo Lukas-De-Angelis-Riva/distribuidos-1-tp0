@@ -6,6 +6,7 @@ T_LENGTH = 1
 L_LENGTH = 4
 
 # Types
+BATCH_TYPE = 'Z'
 BET_TYPE = 'B'
 AGENCY_NAME_TYPE = 'A'
 NAME_TYPE = 'N'
@@ -14,6 +15,7 @@ DOCUMENT_TYPE = 'D'
 BIRTHDATE_TYPE = 'H'
 NUMBER_TYPE = 'U'
 
+FINISH_TYPE = 'F'
 OK_TYPE = 'O'
 
 def read_all(socket, bytes_to_read):
@@ -27,14 +29,14 @@ def read_all(socket, bytes_to_read):
         data += new_data
     return data
 
-def recv_bet(socket):
+def handle_bet(socket, withType=False):
     """
     Reads from the socket a bet. Using the TLV protocol implemented.
     If something goes wrong, a exception will be arise.
     """
-
-    tlv_type = read_all(socket, T_LENGTH) # Deberia recibir el 'B'
-    assert tlv_type.decode('utf-8') == BET_TYPE, "Invalid type: BET excepted"
+    if withType:
+        tlv_type = read_all(socket, T_LENGTH) # Deberia recibir el 'B'
+        assert tlv_type.decode('utf-8') == BET_TYPE, "Invalid type: BET excepted"
 
     bet_len_d = read_all(socket, L_LENGTH) # Deberia recibir el largo del BET (sin contar ni el 'B' ni el largo)
     bet_len = int.from_bytes(bet_len_d, byteorder='big')
@@ -84,6 +86,30 @@ def recv_bet(socket):
         number=raw_bet[NUMBER_TYPE].decode('utf-8'),
     )
 
+def handle_batch(socket):
+    batch_size_d = read_all(socket, L_LENGTH)
+    batch_size = int.from_bytes(batch_size_d, byteorder='big')
+    assert batch_size >= 0, "Invalid length: must be positive"
+
+    bets = []
+    for _ in range(batch_size):
+        bets.append(handle_bet(socket, withType=True))
+
+    return bets
+
+def recv_req(socket):
+    tlv_type_d = read_all(socket, T_LENGTH)
+    tlv_type = tlv_type_d.decode('utf-8')
+
+    if tlv_type == BET_TYPE:
+        return [handle_bet(socket, withType=False)]
+    elif tlv_type == BATCH_TYPE:
+        return handle_batch(socket)
+    elif tlv_type == FINISH_TYPE:
+        return []
+    else:
+        raise ValueError("Unknown TYPE")
+
 def write_all(socket, data):
     bytes_sent = 0
     while bytes_sent < len(data):
@@ -91,12 +117,6 @@ def write_all(socket, data):
         bytes_sent += b
     return bytes_sent
 
-def confirm_bet(socket, number):
-    num_data = number.encode('utf-8')
-    num_data_size = struct.pack("!i", len(num_data))
-
+def confirm_req(socket):
     data = OK_TYPE.encode('utf-8') 
-    data += num_data_size
-    data += num_data
-
     assert write_all(socket, data) == len(data), "Error in confirmation, cannot write all bytes due to an error"

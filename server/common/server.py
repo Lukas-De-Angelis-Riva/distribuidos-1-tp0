@@ -4,7 +4,7 @@ import signal
 
 import time
 
-from common.protocol import recv_bet, confirm_bet
+from common.protocol import recv_req, confirm_req
 from common.utils import store_bets
 
 class Server:
@@ -16,6 +16,7 @@ class Server:
 
         self._keep_running = True
         signal.signal(signal.SIGTERM, self.__stop)
+        self.bet_amount = 0
 
     def run(self):
         """
@@ -51,17 +52,21 @@ class Server:
         client socket will also be closed
         """
 
-        try:
-            bet = recv_bet(client_sock)
-            store_bets([bet])
-            logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
+        while True:
+            try:
+                bets = recv_req(client_sock)
+                if not bets:
+                    break
+                store_bets(bets)
+                self.bet_amount += len(bets)
+                logging.info(f"action: request_processed | result: success")
+                confirm_req(client_sock)
+            except Exception as e:
+                logging.error(f"action: request_processed | result: fail | error: {e}")
+                break
 
-            confirm_bet(client_sock, str(bet.number))
-
-        except Exception as e:
-            logging.error(f"action: recibir_apuesta | result: fail | error: {e}")
-        finally:
-            client_sock.close()
+        logging.info(f"action: finish_processing | result: success | bet_amount: {self.bet_amount}")
+        client_sock.close()
 
     def __accept_new_connection(self):
         """

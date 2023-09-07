@@ -8,6 +8,7 @@ import(
     log "github.com/sirupsen/logrus"
 )
 
+const BATCH_TYPE = 'Z'
 const BET_TYPE = 'B'
 const AGENCY_NAME_TYPE = 'A'
 const NAME_TYPE = 'N'
@@ -16,6 +17,7 @@ const DOCUMENT_TYPE = 'D'
 const BIRTHDATE_TYPE = 'H'
 const NUMBER_TYPE = 'U'
 
+const FINISH_TYPE = 'F'
 const OK_TYPE = 'O'
 
 type NationalLotteryCenter struct {
@@ -49,7 +51,6 @@ func sendData(conn net.Conn, data []byte) error {
         }
         totalSent += sent
     }
-    log.Debugf("action: send_message | result: success | encoded msg: %v", data)
 
     return nil
 }
@@ -65,7 +66,7 @@ func serializeString(field_type byte, field string) []byte {
     return append(serialized, []byte(field)...)
 }
 
-func (p *NationalLotteryCenter) sendBet(bet Bet) error {
+func (p *NationalLotteryCenter) serializeBet(bet Bet) []byte {
     serialized := []byte{}
     serialized = append(serialized, serializeString(AGENCY_NAME_TYPE, p.ID)...)
     serialized = append(serialized, serializeString(NAME_TYPE, bet.Name)...)
@@ -81,7 +82,11 @@ func (p *NationalLotteryCenter) sendBet(bet Bet) error {
     first_part = append(first_part, length...)
 
     data := append(first_part, serialized...)
+    return data
+}
 
+func (p *NationalLotteryCenter) sendBet(bet Bet) error {
+    data := p.serializeBet(bet)
     err := sendData(p.conn, data)
     if err != nil {
         log.Errorf("action: send_message | result: fail | client_id: %v | error: %v", p.ID, err)
@@ -89,6 +94,28 @@ func (p *NationalLotteryCenter) sendBet(bet Bet) error {
     }
 
     return nil
+}
+
+
+// OJO NO HACE LO QUE SE PIDE; TIENE QUE SER SOLO UN LLAMADO A SEND
+func (p *NationalLotteryCenter) sendBatch(batch []Bet) error {
+    first_part := []byte{}
+    // Se envia el indicador
+    first_part = append(first_part, BATCH_TYPE)
+    length := make([]byte, 4)
+    // Se envia cuantas apuestas seran enviadas
+    binary.BigEndian.PutUint32(length, uint32(len(batch)))
+    first_part = append(first_part, length...)
+
+    data := []byte{}
+    for _, bet := range batch {
+        serial_bet := p.serializeBet(bet)
+        data = append(data, serial_bet...)
+    }
+
+    data = append(first_part, data...)
+
+    return sendData(p.conn, data)
 }
 
 func readAll(conn net.Conn, bytesToRead int) ([]byte, error) {
@@ -106,29 +133,29 @@ func readAll(conn net.Conn, bytesToRead int) ([]byte, error) {
     return data, nil
 }
 
-func (p *NationalLotteryCenter) waitConfirmation(bet Bet) error {
-    _, err := readAll(p.conn, 1) // leer el tipo OK
+
+func (p *NationalLotteryCenter) waitConfirmation() error {
+
+    confirmation, err := readAll(p.conn, 1) // leer el tipo
     if err != nil {
-        return errors.New("Confirmation error: cannot read OK_Type")
+        return errors.New("Confirmation error: cannot read TYPE") // probar si funciona %v, err
     }
 
-    confirmation_len_d, err := readAll(p.conn, 4) // leer el largo uint32
-    if err != nil {
-        return errors.New("Confirmation error: cannot read length")
+    if confirmation[0] == byte(OK_TYPE){
+        return nil
+    } else {
+        return errors.New("Confirmation error: NOT OK")
     }
-    confirmation_len := int(binary.BigEndian.Uint32(confirmation_len_d))
+}
 
-    message_d, err := readAll(p.conn, confirmation_len) // leo el numero de apuesta
-    if err != nil {
-        return err
-    }
-    message := string(message_d)
 
-    if(bet.Number != message){
-        return errors.New("Confirmation error: Invalid number")
-    }
+func (p *NationalLotteryCenter) Finish() error {
+    goodbye := []byte{}
+    goodbye = append(goodbye, FINISH_TYPE)
 
-    return nil
+    err := sendData(p.conn, goodbye)
+    return err
+
 }
 
 func (p *NationalLotteryCenter) Close() {

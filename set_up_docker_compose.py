@@ -22,13 +22,13 @@ def info_client(id):
         'environment': [
             f'CLI_ID={id}',
             'CLI_LOG_LEVEL=DEBUG',
-            'CLI_NAME=',
-            'CLI_SURNAME=',
-            'CLI_DOCUMENT=',
-            'CLI_BIRTHDATE=',
-            'CLI_NUMBER='
+            f'CLI_BETS_FILE=agency-{id}.csv',
+            f'CLI_BETS_BATCH_SIZE={id*50}'
             ],
-        'volumes': ['./client/config.yaml:/config.yaml'],
+        'volumes': [
+            './client/config.yaml:/config.yaml',
+            f'./.data/agency-{id}.csv:/agency-{id}.csv',
+        ],
         'networks': ['testing_net'],
         'depends_on': ['server'],
     }
