@@ -5,27 +5,37 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
 ---
-## Instrucciones - Ejercicio 7
+## Instrucciones - Ejercicio 8
+**Observación**: la solución propuesta utiliza la biblioteca threading de python, por ende como explica detalladamente la documentación de [threading](https://docs.python.org/3/library/threading.html), la implementación no ejecuta en paralelo los procesamientos, sino que de manera concurrente. Esto se debe al GIL de python. Decidí hacerlo de esta manera porque me pareció más sencillo y, como el servidor hace mayoritariamente operaciones de entrada y salida, no veo la necesidad de complejizarlo y llevarlo a multiprocesamiento. Sin embargo si se quiere hacer una implementación paralela habría que usar la biblioteca [multiprocessing](https://docs.python.org/3/library/multiprocessing.html#module-multiprocessing).
 
-En este ejercicio se realizó nuevamente un refactor sobre la comunicación entre el cliente y el servidro. Se agregaron nuevos tags:
+Para hacer más sencillo el código, se creo una nueva clase: `Agency` que será un objeto Thread.
+```py
+class Agency(threading.Thread):
+    def __init__(self, client_sock, bets_file_lock: threading.Lock, processed_agencies: Counter, processed_agencies_lock: threading.Lock):
 ```
-POLL_TYPE = 'P'
+Este objeto Thread al inicializarse recibirá:
+* El socket del cliente: que será manejado como durante todo el TP por las funciones definidas en `common/protocol.py` 
+* Lock del archivo de apuestas: el lock será aquel que usarán todos los threads que manejan las agencias para escribir y leer del archivo de manera mutuamente excluyente.
+* Un contador: dicho contador será el objeto mutable que compartirán todos los threads que manejan las agencias para contabilizar si todas sus apuestas fueron cargadas o no.
+* El lock del contador: como es un objeto mutable compartido es necesario utilizar un lock para no tener condiciones de carrera.
 
-AWAIT_TYPE = 'Y'
-WINNERS_TYPE = 'W'
+La lógica de las agencias será idéntica a aquella planteada en el ejercicio 7, aunque utilizando los locks para coordinar el acceso a las áreas exclusivas.
+```py
+req, data = recv_req(self.client_sock)
+if req == common.protocol.UPLOAD_BETS_REQ:
+    bets = data
+    self.bets_file_lock.acquire()
+    store_bets(bets)
+    self.bets_file_lock.release()
+    ...
 ```
-El tag POLL es un tag que utiliza el cliente para indicarle al servidor que quiere conocer a los ganadores del sorteo.
 
-El tag AWAIT es un tag que utiliza el servidor para indicarle al cliente que los datos aún no están disponibles, y que vuelva a conectarse más tarde, que quizás estén.
+En el archivo `common/server.py` queda la lógica del gestor de conexiones (agencias activas y finalizadas). Dicho gestor asimismo es quien almacena los locks y el contador que será compartido entre los distintos hilos.
 
-El tag WINNERS_TYPE indica que, a continuación, se enviarán los datos (documentos) de los ganadores del sorteo para la agencia en cuestión.
+En ese sentido entonces, el método `run` de la clase Server tendrá un loop donde acepta las conexiones, una vez establecida la comunicación con un cliente crea una agencia y le da start. En esa misma iteración se aprovecha para hacer `join` a las agencias que terminaron de procesar (y por ende su hilo terminó de ejecutar `is_alive() => False`)
+En caso de que se reciba una señal de SIGTERM el servidor hará `stop` a todas las agencias vivas y luego les hará join, para terminar lo más rápido posible, cerrando todo gracefully.
 
-El cliente tomará una postura de polling sobre la información de los ganadores. Se conectará al servidor utilizando un protocolo de exponential backoff (es decir, a medida que más AWAITs reciba más tiempo quedará durmiendo). El servidor como fue indicado puede devolver el tag de AWAIT y el tag de WINNERS seguido de los ganadores.
-
-
-El servidor es bastante similar al previo, procesa las apuestas de manera individual (sin concurrencia) y una vez finalizada la comunicación con el cliente cierra la conexión. Dicho cliente tendrá que volver a conectarse en caso de que quiera conocer los ganadores. La solicitud de Polling se maneja en el mismo hilo de ejecución que el procesamiento de apuestas, por lo que cuando se recibe una solicitud de polling de un cliente, y aún no se han cargado todas las apuestas, en servidor enviará el tag AWAIT y cerrará la conexión para comunicarse con las agencias que aún no hay enviado sus apuestas.
-
-Una vez se cargaron todas las apuestas en el servidor, a los clientes que soliciten conocer a los ganadores se les informará mediante el tag WINNERS y luego se cerrará la conexión para atender a los demás clientes lo más rápido posible.
+Nuevamente, para ejecutarlo es necesario descomprimir los archivos de `./data/dataset.zip` en el directorio `./data/`
 
 ---
 

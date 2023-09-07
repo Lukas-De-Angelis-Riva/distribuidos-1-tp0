@@ -21,6 +21,10 @@ class Server:
         self.processed_agencies_lock = threading.Lock()
 
     def __joinFinishedAgencies(self, agencies):
+        """
+        Realiza join a las agencias que hayan terminado el procesamiento.
+        Elimina de la lista 'agencies' dichas agencias.
+        """
         finished_agencies = []
         for agency in agencies:
             if not agency.is_alive():
@@ -31,11 +35,19 @@ class Server:
             agencies.remove(f_agency)
 
     def __stopUnfinishedAgencies(self, agencies):
+        """
+        Realiza la salida gracefully del servidor, frenando los procesamientos de los hilos
+        y realizando join para que no queden huerfanos.
+        """
         for agency in agencies:
             agency.stop()
             agency.join()
 
     def run(self):
+        """
+        Realiza el loop del servidor. Acepta conexiones y genera una agencia para procesar sus
+        peticiones.
+        """
         agencies = []
         while self._keep_running:
             client_sock = self.__accept_new_connection()
@@ -47,12 +59,16 @@ class Server:
 
             self.__joinFinishedAgencies(agencies)
 
-        # Si quedo alguna agencia viva, se le hace stop y luego se hace join para que no queden zombies
+        # Si quedo alguna agencia viva, se le hace stop y luego se hace join para que no queden huerfanos
         self.__stopUnfinishedAgencies(agencies)
 
         logging.info('action: stop_server | result: success')
 
     def __stop(self, *args):
+        """
+        Handler de la señal de SIGTERM. Cierra el socket del servidor. Cambia el flag de keep_running
+        para indicar que el loop del servidor debe finalizar.
+        """
         logging.info('action: stop_server | result: in_progress')
         self._keep_running = False
         self._server_socket.shutdown(socket.SHUT_RDWR)
@@ -62,10 +78,10 @@ class Server:
 
     def __accept_new_connection(self):
         """
-        Accept new connections
+        Acepta nuevas conexiones.
 
-        Function blocks until a connection to a client is made.
-        Then connection created is printed and returned
+        La funcion se bloque hasta que haya una conexion con un cliente.
+        Escribe en el log la conexion susodicha.
         """
 
         # Connection arrived

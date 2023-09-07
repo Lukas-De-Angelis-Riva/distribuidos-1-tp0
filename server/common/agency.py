@@ -15,6 +15,15 @@ class Agency(threading.Thread):
         self.processed_agencies_lock = processed_agencies_lock
 
     def run(self):
+        """
+        Loop de la agencia. Lee las solicitudes del cliente, estas pueden ser:
+            * Enviar apuestas o chunks de apuestas
+            * Finalizar el envio de apuestas
+            * Solicitar los ganadores
+
+        Coordina la conexion con el cliente y hace uso de los mecanismos de sincronismo entre otras agencias,
+        sobre el archivo de apuestas y el contador de agencias que terminaron su procesamiento. 
+        """
         while True:
             try:
                 req, data = recv_req(self.client_sock)
@@ -60,6 +69,10 @@ class Agency(threading.Thread):
         self.client_sock.close()
 
     def __getWinners(self, agency_number):
+        """
+        Funcion que, dado un numero de agencia, devuelve los documentos
+        de todos aquellos participantes que ganaron el sorteo
+        """
         self.bets_file_lock.acquire()
         winners = []
         for bet in load_bets():
