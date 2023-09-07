@@ -5,25 +5,27 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
 ---
-## Instrucciones - Ejercicio 6
+## Instrucciones - Ejercicio 7
 
-En este ejercicio se realizó un refactor sobre la comunicación entre el cliente y el servidor. Ahora se agregaron dos nuevos tags:
-
+En este ejercicio se realizó nuevamente un refactor sobre la comunicación entre el cliente y el servidro. Se agregaron nuevos tags:
 ```
-BATCH_TYPE = 'Z'
-FINISH_TYPE = 'F'
+POLL_TYPE = 'P'
+
+AWAIT_TYPE = 'Y'
+WINNERS_TYPE = 'W'
 ```
-El tag `BATCH_TYPE` indica que lo próximo en recibirse se trata de un batch. La lógica es similar a la anterior, sólo que en vez de recibir la cantidad de bytes que serán necesario leer, se envía la cantidad de apuestas a leer, por ejemplo:
-```
-BATCH_TYPE | 2 | B | Lukas ... | B | Kevin ... | 
-```
+El tag POLL es un tag que utiliza el cliente para indicarle al servidor que quiere conocer a los ganadores del sorteo.
 
-Mientras que el tag `FINISH_TYPE` fue necesario introducirlo para comunicar desde el cliente que se finalizó la carga de apuestas en el servidor. Y por ende, el mismo puede concluir la comunicación y atender a otro cliente. 
+El tag AWAIT es un tag que utiliza el servidor para indicarle al cliente que los datos aún no están disponibles, y que vuelva a conectarse más tarde, que quizás estén.
+
+El tag WINNERS_TYPE indica que, a continuación, se enviarán los datos (documentos) de los ganadores del sorteo para la agencia en cuestión.
+
+El cliente tomará una postura de polling sobre la información de los ganadores. Se conectará al servidor utilizando un protocolo de exponential backoff (es decir, a medida que más AWAITs reciba más tiempo quedará durmiendo). El servidor como fue indicado puede devolver el tag de AWAIT y el tag de WINNERS seguido de los ganadores.
 
 
-Sobre el hecho de la cantidad de registros que se envía en cada batch, se decidió hacer de manera configurable en el `docker-compose-dev.yaml`, donde se puede asignar una cantidad de registros a enviar `CLI_BETS_BATCH_SIZE`. Para probar diferentes configuraciones se propuso que los diferentes clientes tengan un BATCH_SIZE que sea diferente.
+El servidor es bastante similar al previo, procesa las apuestas de manera individual (sin concurrencia) y una vez finalizada la comunicación con el cliente cierra la conexión. Dicho cliente tendrá que volver a conectarse en caso de que quiera conocer los ganadores. La solicitud de Polling se maneja en el mismo hilo de ejecución que el procesamiento de apuestas, por lo que cuando se recibe una solicitud de polling de un cliente, y aún no se han cargado todas las apuestas, en servidor enviará el tag AWAIT y cerrará la conexión para comunicarse con las agencias que aún no hay enviado sus apuestas.
 
-Por último, el archivo de configuración también está asignado desde el `docker-compose-dev.yaml` en el tag `CLI_BETS_FILE`. Recordar que para poder utilizar dichos archivos primero será necesario descomprimir el archivo .zip, y para el correcto funcionamiento del archivo `set_up_docker_compose.py` estos deben estar directamente en `./data` (no dentro de otra carpeta).
+Una vez se cargaron todas las apuestas en el servidor, a los clientes que soliciten conocer a los ganadores se les informará mediante el tag WINNERS y luego se cerrará la conexión para atender a los demás clientes lo más rápido posible.
 
 ---
 
