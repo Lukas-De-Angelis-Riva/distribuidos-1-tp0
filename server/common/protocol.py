@@ -5,7 +5,7 @@ from common.utils import Bet
 T_LENGTH = 1
 L_LENGTH = 4
 
-# Types
+# Data tags
 BATCH_TYPE = 'Z'
 BET_TYPE = 'B'
 AGENCY_NAME_TYPE = 'A'
@@ -15,8 +15,19 @@ DOCUMENT_TYPE = 'D'
 BIRTHDATE_TYPE = 'H'
 NUMBER_TYPE = 'U'
 
-FINISH_TYPE = 'F'
+# server responses types
+WINNERS_TYPE = 'W'
+AWAIT_TYPE = 'Y'
 OK_TYPE = 'O'
+
+# client requests types
+POLL_TYPE = 'P'
+FINISH_TYPE = 'F'
+
+# Requests
+UPLOAD_BETS_REQ = 1 
+FINISH_REQ = 2
+POLL_WINNERS_REQ = 3
 
 def read_all(socket, bytes_to_read):
     data = b''
@@ -97,16 +108,29 @@ def handle_batch(socket):
 
     return bets
 
+# Handles poll request
+# ['P' | agency_no:4bytes ]
+def handle_poll(socket):
+    agency_name_d = read_all(socket, L_LENGTH)
+    agency_name = int.from_bytes(agency_name_d, byteorder='big')
+    return agency_name
+
 def recv_req(socket):
     tlv_type_d = read_all(socket, T_LENGTH)
     tlv_type = tlv_type_d.decode('utf-8')
 
     if tlv_type == BET_TYPE:
-        return [handle_bet(socket, withType=False)]
+        return UPLOAD_BETS_REQ, [handle_bet(socket, withType=False)]
+
     elif tlv_type == BATCH_TYPE:
-        return handle_batch(socket)
+        return UPLOAD_BETS_REQ, handle_batch(socket)
+
     elif tlv_type == FINISH_TYPE:
-        return []
+        return FINISH_REQ, []
+
+    elif tlv_type == POLL_TYPE:
+        return POLL_WINNERS_REQ, handle_poll(socket)
+
     else:
         raise ValueError("Unknown TYPE")
 
@@ -120,3 +144,20 @@ def write_all(socket, data):
 def confirm_req(socket):
     data = OK_TYPE.encode('utf-8') 
     assert write_all(socket, data) == len(data), "Error in confirmation, cannot write all bytes due to an error"
+
+def force_to_wait(socket):
+    data = AWAIT_TYPE.encode('utf-8')
+    assert write_all(socket, data) == len(data), "Error forcing the client to wait, cannot write all bytes due to an error"
+
+def notify_winners(socket, winners):
+    data = b''
+    data += WINNERS_TYPE.encode('utf-8')         # Adding tag WINNERS
+    data += int.to_bytes(len(winners), 4, 'big') # Adding how many winners
+
+    for winner in winners:
+        encoded_document = winner.encode('utf-8')
+        data += DOCUMENT_TYPE.encode('utf-8')
+        data += int.to_bytes(len(encoded_document), 4, 'big')
+        data += encoded_document
+
+    assert write_all(socket, data) == len(data), "Error notifying winners, cannot write all bytes due to an error"

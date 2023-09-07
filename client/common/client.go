@@ -4,6 +4,7 @@ import (
     "io"
     "os"
     "encoding/csv"
+    "time"
 
     log "github.com/sirupsen/logrus"
 )
@@ -31,8 +32,52 @@ func NewClient(config ClientConfig) *Client {
     return client
 }
 
+func (c *Client) Run () {
+    err := c.StartClientLoop()
+    if err != nil {
+        return
+    }
+
+    err = c.CheckWinners()
+    if err != nil {
+        return
+    }
+}
+
+func (c *Client) CheckWinners() error {
+    log.Infof("action: consulta_ganadores | result: starting")
+
+    waitingTime := 1
+    for {
+        c.center = nil
+        c.center = NewNationalLotteryCenter(c.config.ID, c.config.ServerAddress)
+
+        log.Infof("action: polling | result: in_progress")
+        status, winners, err := c.center.PollWinners()
+
+        if err != nil {
+            // log mal ahi
+            c.center.Close()
+            return err
+        }
+        log.Infof("action: polling | result: success")
+
+        if status == WAIT {
+            c.center.Close()
+            log.Infof("action: consulta_ganadores | result: in_progress | sleeping time: %v", waitingTime)
+            time.Sleep(time.Duration(waitingTime) * time.Second)
+            waitingTime *= 2
+        } else {
+            log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+            c.center.Close()
+            break
+        }
+    }
+    return nil
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
+func (c *Client) StartClientLoop() error {
     c.center = NewNationalLotteryCenter(c.config.ID, c.config.ServerAddress)
 
     defer c.center.Close()
@@ -40,7 +85,7 @@ func (c *Client) StartClientLoop() {
     file, err := os.Open(c.config.BetsFile)
     if err != nil {
         log.Fatalf("action: abrir_archivo | result: fail | file_name: %v | error: %v", c.config.BetsFile, err)
-        return
+        return err
     }
 
     defer file.Close()
@@ -57,17 +102,17 @@ func (c *Client) StartClientLoop() {
         if err == io.EOF {
             err = c.center.sendBatch(batch)
             if err != nil {
-                return
+                return err
             }
 
             err = c.center.waitConfirmation()
             if err != nil {
                 log.Fatalf("action: wait_confirmation | result: fail | error: %v", err)
-                return
+                return err
             }
 
             i++
-            log.Infof("action: batch_sent | result: success | no: %v", i)
+            log.Infof("action: batch enviado | result: success | no: %v | info: ultimo", i)
 
             batch = nil
             break
@@ -76,7 +121,7 @@ func (c *Client) StartClientLoop() {
         if err != nil {
             log.Fatalf("action: read_record | result: fail | error: %v", err)
             // closes in defer
-            return
+            return err
         }
 
         batch = append(batch, fromRecord(record))
@@ -84,13 +129,13 @@ func (c *Client) StartClientLoop() {
         if uint(len(batch)) == c.config.BatchSize {
             c.center.sendBatch(batch)
             if err != nil {
-                return
+                return err
             }
 
             c.center.waitConfirmation()
             if err != nil {
                 log.Fatalf("action: wait_confirmation | result: fail | error: %v", err)
-                return
+                return err
             }
 
             i++
@@ -105,5 +150,6 @@ func (c *Client) StartClientLoop() {
     if err != nil {
         log.Fatalf("action: finishing_connection | result: fail | error: %v", err)
     }
-    log.Info("action: closing_socket | result success")
+
+    return err
 }

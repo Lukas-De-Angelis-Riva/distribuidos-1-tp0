@@ -4,6 +4,7 @@ import(
     "net"
     "encoding/binary"
     "errors"
+    "strconv"
 
     log "github.com/sirupsen/logrus"
 )
@@ -17,8 +18,16 @@ const DOCUMENT_TYPE = 'D'
 const BIRTHDATE_TYPE = 'H'
 const NUMBER_TYPE = 'U'
 
+const POLL_TYPE = 'P'
 const FINISH_TYPE = 'F'
+
+const WINNERS_TYPE = 'W'
+const AWAIT_TYPE = 'Y'
 const OK_TYPE = 'O'
+
+const ERROR = -1
+const WAIT = 0
+const INFO = 1
 
 type NationalLotteryCenter struct {
     conn net.Conn 
@@ -96,8 +105,6 @@ func (p *NationalLotteryCenter) sendBet(bet Bet) error {
     return nil
 }
 
-
-// OJO NO HACE LO QUE SE PIDE; TIENE QUE SER SOLO UN LLAMADO A SEND
 func (p *NationalLotteryCenter) sendBatch(batch []Bet) error {
     first_part := []byte{}
     // Se envia el indicador
@@ -160,4 +167,86 @@ func (p *NationalLotteryCenter) Finish() error {
 
 func (p *NationalLotteryCenter) Close() {
     p.conn.Close()
+}
+
+func (p *NationalLotteryCenter) ReadDocument() (string, error) {
+    tlv_type, err := readAll(p.conn, 1) // leo el tipo
+    if err != nil {
+        return "", err
+    }
+
+    if tlv_type[0] == byte(DOCUMENT_TYPE) {
+        document_len_d, err := readAll(p.conn, 4) // leer el tamaño
+        if err != nil {
+            return "", err
+        }
+        document_len := int(binary.BigEndian.Uint32(document_len_d))
+
+        document_d, err := readAll(p.conn, document_len)
+        if err != nil {
+            return "", err
+        }
+
+        document := string(document_d)
+        return document, nil
+
+    } else {
+        return "", errors.New("Protocol error: unexpected type | expected: document")
+    }
+}
+
+func (p *NationalLotteryCenter) ReadWinners() ([]string, error) {
+    amount_d, err := readAll(p.conn, 4) // leer el int: cantidad de ganadores
+    if err != nil {
+        return []string{}, err
+    }
+    amount := int(binary.BigEndian.Uint32(amount_d))
+
+    winners := []string{}
+
+    for total_readed := 0; total_readed < amount; {
+        document, err := p.ReadDocument()
+        if err != nil {
+            return []string{}, err
+        }
+
+        winners = append(winners, document)
+
+        total_readed += 1
+    }
+
+    return winners, nil
+}
+
+func (p *NationalLotteryCenter) PollWinners() (int, []string, error){
+    poll_req := []byte{}
+    poll_req = append(poll_req, POLL_TYPE)
+
+    agency_id := make([]byte, 4)
+    id, err := strconv.ParseInt(p.ID, 10, 32)
+    if err != nil {
+        return ERROR, []string{}, err
+    }
+
+    binary.BigEndian.PutUint32(agency_id, uint32(id))
+    poll_req = append(poll_req, agency_id...)
+
+    err = sendData(p.conn, poll_req)
+    if err != nil {
+        return ERROR, []string{}, err
+    }
+
+    status, err := readAll(p.conn, 1) // leer el tipo
+    if err != nil {
+        return ERROR, []string{}, err
+    }
+
+    if status[0] == byte(AWAIT_TYPE){
+        return WAIT, []string{}, nil
+    } else if status[0] == byte(WINNERS_TYPE){
+        winners, err := p.ReadWinners()
+        return INFO, winners, err
+    } else {
+        return ERROR, []string{}, errors.New("Poll error: unknown type")
+    }
 }

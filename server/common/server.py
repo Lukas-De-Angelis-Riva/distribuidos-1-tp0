@@ -4,8 +4,9 @@ import signal
 
 import time
 
-from common.protocol import recv_req, confirm_req
-from common.utils import store_bets
+import common
+from common.protocol import recv_req, confirm_req, force_to_wait, notify_winners
+from common.utils import store_bets, load_bets, has_won
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -17,6 +18,7 @@ class Server:
         self._keep_running = True
         signal.signal(signal.SIGTERM, self.__stop)
         self.bet_amount = 0
+        self.processed_agencies = 0
 
     def run(self):
         """
@@ -44,6 +46,13 @@ class Server:
         self._server_socket.close()
         logging.info('action: closing_socket | result: success')
 
+    def __getWinners(self, agency_number):
+        winners = []
+        for bet in load_bets():
+            if has_won(bet) and agency_number == int(bet.agency):
+                winners.append(bet.document)
+        return winners
+
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -54,18 +63,36 @@ class Server:
 
         while True:
             try:
-                bets = recv_req(client_sock)
-                if not bets:
+                req, data = recv_req(client_sock)
+                if req == common.protocol.UPLOAD_BETS_REQ:
+                    bets = data
+                    store_bets(bets)
+                    self.bet_amount += len(bets)
+                    logging.info(f"action: request_processed | result: success | client: {client_sock.getpeername()[0]}")
+                    confirm_req(client_sock)
+
+                elif req == common.protocol.FINISH_REQ:
+                    logging.info(f"action: finish_processing | result: success | client: {client_sock.getpeername()[0]} | bet_amount: {self.bet_amount}")
+                    self.processed_agencies += 1 # REF: maybe a set, to prevent malicious clients
+                    if self.processed_agencies == 5:
+                        logging.info(f"action: sorteo | result: success")
                     break
-                store_bets(bets)
-                self.bet_amount += len(bets)
-                logging.info(f"action: request_processed | result: success")
-                confirm_req(client_sock)
+
+                elif req == common.protocol.POLL_WINNERS_REQ:
+                    agency_number = data
+
+                    if self.processed_agencies == 5:
+                        winners = self.__getWinners(agency_number)
+                        notify_winners(client_sock, winners)
+                        break # goodbye
+                    else:
+                        force_to_wait(client_sock)
+                        break # goodbye
+
             except Exception as e:
                 logging.error(f"action: request_processed | result: fail | error: {e}")
                 break
 
-        logging.info(f"action: finish_processing | result: success | bet_amount: {self.bet_amount}")
         client_sock.close()
 
     def __accept_new_connection(self):
