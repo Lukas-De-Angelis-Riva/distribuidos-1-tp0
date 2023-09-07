@@ -40,11 +40,13 @@ func NewClient(config ClientConfig) *Client {
 func (c *Client) Run () {
     err := c.StartClientLoop()
     if err != nil {
+        log.Fatalf("action: client_loop | result: fail | error: %v", err)
         return
     }
 
     err = c.CheckWinners()
     if err != nil {
+        log.Fatalf("action: check_winners | result: fail | error: %v", err)
         return
     }
 }

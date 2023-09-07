@@ -81,3 +81,6 @@ class Agency(threading.Thread):
                 winners.append(bet.document)
         self.bets_file_lock.release()
         return winners
+
+    def stop(self):
+        self.client_sock.close()
