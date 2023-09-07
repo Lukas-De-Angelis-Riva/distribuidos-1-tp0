@@ -5,55 +5,25 @@ En el presente repositorio se provee un ejemplo de cliente-servidor el cual corr
 Por otro lado, se presenta una guía de ejercicios que los alumnos deberán resolver teniendo en cuenta las consideraciones generales descriptas al pie de este archivo.
 
 ---
-## Instrucciones - Ejercicio 5
+## Instrucciones - Ejercicio 6
 
-Se implementó el protocolo de comunicación entre cliente y servidor. Se trata de un protocolo sencillo del tipo TLV (tipo largo valor). Para simplificar la explicación consideremos que comunicar del cliente al servidor la siguiente apuesta:
-```
-AGENCIA=1
-NOMBRE=SANTIAGO LIONEL
-APELLIDO=LORCA
-DOCUMENTO=30904465
-NACIMIENTO=1999-03-17
-NUMERO=7574
-```
-El protocolo se define de la siguiente manera: primero un byte que indique que se está por recibir una apuesta (se tomó el valor 66, ya que es el número del caracter 'B' de BET). Luego de dicho byte se escriben otros 4 bytes en BigEndian que indiquen la cantidad de bytes próximos a leer para completar la apuesta correctamente.
+En este ejercicio se realizó un refactor sobre la comunicación entre el cliente y el servidor. Ahora se agregaron dos nuevos tags:
 
-Dentro del payload se define una estructura parecida, donde se pondrá un indicador (un byte) del tipo de información que se recibe a continuación y la cantidad de bytes próximos que son parte de dicho campo (field).
 ```
-| type | size | --- payload --- | type | size | --- payload --- |
+BATCH_TYPE = 'Z'
+FINISH_TYPE = 'F'
+```
+El tag `BATCH_TYPE` indica que lo próximo en recibirse se trata de un batch. La lógica es similar a la anterior, sólo que en vez de recibir la cantidad de bytes que serán necesario leer, se envía la cantidad de apuestas a leer, por ejemplo:
+```
+BATCH_TYPE | 2 | B | Lukas ... | B | Kevin ... | 
 ```
 
-Entre ellos tenemos:
-```
-AGENCY_NAME_TYPE = 'A'
-NAME_TYPE = 'N'
-LAST_NAME_TYPE = 'L'
-DOCUMENT_TYPE = 'D'
-BIRTHDATE_TYPE = 'H'
-NUMBER_TYPE = 'U'
-```
-
-Entonces, por ejemplo nuestro caso de estudio (Santiago Lorca) tendrá la siguiente representación
-```
-[66] [0 0 0 73] [65] [0 0 0 1] [49] [78] [0 0 0 15] [83 65 78 84 73 65 71 79 32 76 73 79 78 69 76] [76] [0 0 0 5] [76 79 82 67 65] [68] [0 0 0 8] [51 48 57 48 52 52 54 53] [72] [0 0 0 10] [49 57 57 57 45 48 51 45 49 55] [85] [0 0 0 4] [55 53 55 52]
-
-[66] [0 0 0 73]: APUESTA DE 73 BYTES
-[65] [0 0 0 1] [49]: AGENCIA, 1 BYTE. CARACTER 49 = "1"
-[78] [0 0 0 15] [83 65 78 84 73 65 71 79 32 76 73 79 78 69 76]: NOMBRE, 15 BYTES.
-[76] [0 0 0 5] [76 79 82 67 65]: APELLIDO, 5 BYTES
-[68] [0 0 0 8] [51 48 57 48 52 52 54 53]: DNI, 8 BYTES
-[72] [0 0 0 10] [49 57 57 57 45 48 51 45 49 55]: FECHA DE NACIMIENTO, 10 BYTES YYYY-MM-DD
-[85] [0 0 0 4] [55 53 55 52]: NUMERO, 4 BYTES
-```
-
-En este sentido el protocolo no tiene un orden intrínseco de los atributos de la apuesta. Más aún, si son definidos múltiples campos para un mismo tipo (es decir, múltiples veces el número de documento por ejemplo) el servidor se quedará con la información más reciente (es decir, la última obtenida).
+Mientras que el tag `FINISH_TYPE` fue necesario introducirlo para comunicar desde el cliente que se finalizó la carga de apuestas en el servidor. Y por ende, el mismo puede concluir la comunicación y atender a otro cliente. 
 
 
-Una vez enviada y recibida la información, el cliente se quedará esperando a la espera de una confirmación de su apuesta, enviada por el servidor una vez que la apuesta haya sido guardada correctamente. Dicha confirmación se hace de una manera similar a la comunicación previamente explicada. Ya que se tendrá un tipo que indique el éxito de la apuesta, un largo que indica el tamaño del payload, que contendrá el número de apuesta elegido, para que el cliente pueda comparar el número que envió con el número recibido.
+Sobre el hecho de la cantidad de registros que se envía en cada batch, se decidió hacer de manera configurable en el `docker-compose-dev.yaml`, donde se puede asignar una cantidad de registros a enviar `CLI_BETS_BATCH_SIZE`. Para probar diferentes configuraciones se propuso que los diferentes clientes tengan un BATCH_SIZE que sea diferente.
 
-Una vez hecha dicha confirmación el cliente cerrará la comunicación con el servidor, y el servidor hará lo susodicho de su lado, dejando lugar a otro cliente para realizar apuestas.
-
-El protocolo fue implementado mayormente en los archivos `server/common/protocol.py` y `client/common/national_lottery_center.go`
+Por último, el archivo de configuración también está asignado desde el `docker-compose-dev.yaml` en el tag `CLI_BETS_FILE`. Recordar que para poder utilizar dichos archivos primero será necesario descomprimir el archivo .zip, y para el correcto funcionamiento del archivo `set_up_docker_compose.py` estos deben estar directamente en `./data` (no dentro de otra carpeta).
 
 ---
 
