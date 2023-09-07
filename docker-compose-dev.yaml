@@ -14,6 +14,11 @@ services:
     environment:
     - CLI_ID=1
     - CLI_LOG_LEVEL=DEBUG
+    - CLI_NAME=LUKAS NAHUEL
+    - CLI_SURNAME=DE ANGELIS RIVA
+    - CLI_DOCUMENT=42340222
+    - CLI_BIRTHDATE=2000-01-06
+    - CLI_NUMBER=91218
     image: client:latest
     networks:
     - testing_net
@@ -27,6 +32,11 @@ services:
     environment:
     - CLI_ID=2
     - CLI_LOG_LEVEL=DEBUG
+    - CLI_NAME=KEVIN
+    - CLI_SURNAME=DE ANGELIS RIVA
+    - CLI_DOCUMENT=44340223
+    - CLI_BIRTHDATE=2002-10-15
+    - CLI_NUMBER=1234
     image: client:latest
     networks:
     - testing_net
@@ -40,6 +50,47 @@ services:
     environment:
     - CLI_ID=3
     - CLI_LOG_LEVEL=DEBUG
+    - CLI_NAME=KIARA LAURA
+    - CLI_SURNAME=DE ANGELIS RIVA
+    - CLI_DOCUMENT=45131002
+    - CLI_BIRTHDATE=2004-04-15
+    - CLI_NUMBER=9941
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client4:
+    container_name: client4
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=4
+    - CLI_LOG_LEVEL=DEBUG
+    - CLI_NAME=DIEGO
+    - CLI_SURNAME=DE ANGELIS
+    - CLI_DOCUMENT=22000112
+    - CLI_BIRTHDATE=1971-06-20
+    - CLI_NUMBER=8188
+    image: client:latest
+    networks:
+    - testing_net
+    volumes:
+    - ./client/config.yaml:/config.yaml
+  client5:
+    container_name: client5
+    depends_on:
+    - server
+    entrypoint: /client
+    environment:
+    - CLI_ID=5
+    - CLI_LOG_LEVEL=DEBUG
+    - CLI_NAME=VIRGINIA LAURA
+    - CLI_SURNAME=RIVA
+    - CLI_DOCUMENT=23123456
+    - CLI_BIRTHDATE=1972-12-12
+    - CLI_NUMBER=1212
     image: client:latest
     networks:
     - testing_net

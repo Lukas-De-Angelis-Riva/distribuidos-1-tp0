@@ -1,13 +1,6 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
-	"net"
-	"time"
-	"os"
-	"os/signal"
-	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -16,14 +9,17 @@ import (
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
-	LoopLapse     time.Duration
-	LoopPeriod    time.Duration
+	Name          string
+	Surname       string
+	Document      string
+	BirthDate     string
+	Number        string
 }
 
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
-	conn   net.Conn
+	center *NationalLotteryCenter
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -35,84 +31,42 @@ func NewClient(config ClientConfig) *Client {
 	return client
 }
 
-// CreateClientSocket Initializes client socket. In case of
-// failure, error is printed in stdout/stderr and exit 1
-// is returned
-func (c *Client) createClientSocket() error {
-	conn, err := net.Dial("tcp", c.config.ServerAddress)
-	if err != nil {
-		log.Fatalf(
-	        "action: connect | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-	}
-	c.conn = conn
-	return nil
-}
-
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// autoincremental msgID to identify every message sent
-	msgID := 1
-	signalChan := make(chan os.Signal, 1)
-    signal.Notify(signalChan, syscall.SIGTERM)
+	c.center = NewNationalLotteryCenter(c.config.ID, c.config.ServerAddress)
 
-loop:
-	// Send messages if the loopLapse threshold has not been surpassed
-	for timeout := time.After(c.config.LoopLapse); ; {
-		select {
-		case <-timeout:
-	        log.Infof("action: timeout_detected | result: success | client_id: %v",
-                c.config.ID,
-            )
-			break loop
-		case <-signalChan:
-	        log.Infof("action: shutdown | result: in_progress | client_id: %v",
-                c.config.ID,
-            )
-            close(signalChan)
-            log.Infof("action: release_signal_channel | result: success | client_id: %v",
-                c.config.ID,
-            )
-            c.conn.Close()
-            log.Infof("action: release_socket | result: success | client_id: %v",
-                c.config.ID,
-            )
-            break loop
-
-		default:
-		}
-
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
-
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
-		msgID++
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-                c.config.ID,
-				err,
-			)
-			return
-		}
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-            c.config.ID,
-            msg,
-        )
-
-		// Wait a time between sending one message and the next one
-		time.Sleep(c.config.LoopPeriod)
+	bet := Bet{
+		Name: c.config.Name,
+		Surname: c.config.Surname,
+		Document: c.config.Document,
+		BirthDate: c.config.BirthDate,
+		Number: c.config.Number,
 	}
 
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	err := c.center.sendBet(bet)
+	if err != nil {
+        log.Fatalf(
+            "action: apuesta_enviada | result: fail | client_id: %v | error: %v",
+            c.config.ID,
+            err,
+        )
+        c.center.Close()
+        return
+	}
+
+	err = c.center.waitConfirmation(bet)
+	if err != nil {
+        log.Fatalf(
+            "action: esperando_confirmacion | result: fail | client_id: %v | error: %v",
+            c.config.ID,
+            err,
+        )
+        c.center.Close()
+        return
+	}
+
+	log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", bet.Document, bet.Number)
+
+	c.center.Close()
+	log.Info("action: closing_socket | result success")
 }

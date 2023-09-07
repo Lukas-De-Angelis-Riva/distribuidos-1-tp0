@@ -19,7 +19,15 @@ def info_client(id):
         'container_name': f'client{id}',
         'image': 'client:latest',
         'entrypoint': '/client',
-        'environment': [f'CLI_ID={id}', 'CLI_LOG_LEVEL=DEBUG'],
+        'environment': [
+            f'CLI_ID={id}',
+            'CLI_LOG_LEVEL=DEBUG',
+            'CLI_NAME=',
+            'CLI_SURNAME=',
+            'CLI_DOCUMENT=',
+            'CLI_BIRTHDATE=',
+            'CLI_NUMBER='
+            ],
         'volumes': ['./client/config.yaml:/config.yaml'],
         'networks': ['testing_net'],
         'depends_on': ['server'],

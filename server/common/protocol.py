@@ -1,5 +1,6 @@
 import socket
-from utils import Bet
+import struct
+from common.utils import Bet
 
 T_LENGTH = 1
 L_LENGTH = 4
@@ -12,6 +13,8 @@ LAST_NAME_TYPE = 'L'
 DOCUMENT_TYPE = 'D'
 BIRTHDATE_TYPE = 'H'
 NUMBER_TYPE = 'U'
+
+OK_TYPE = 'O'
 
 def read_all(socket, bytes_to_read):
     data = b''
@@ -73,10 +76,27 @@ def recv_bet(socket):
     assert raw_bet[NUMBER_TYPE], "Invalid bet: no number provided"
 
     return Bet(
-        agency=str(int.from_bytes(raw_bet[AGENCY_NAME_TYPE], byteorder='big')), 
+        agency=raw_bet[AGENCY_NAME_TYPE].decode('utf-8'),
         first_name=raw_bet[NAME_TYPE].decode('utf-8'),
         last_name=raw_bet[LAST_NAME_TYPE].decode('utf-8'),
         document=raw_bet[DOCUMENT_TYPE].decode('utf-8'),
         birthdate=raw_bet[BIRTHDATE_TYPE].decode('utf-8'),
-        number=str(int.from_bytes(raw_bet[NUMBER_TYPE], byteorder='big'))
+        number=raw_bet[NUMBER_TYPE].decode('utf-8'),
     )
+
+def write_all(socket, data):
+    bytes_sent = 0
+    while bytes_sent < len(data):
+        b = socket.send(data[bytes_sent:])
+        bytes_sent += b
+    return bytes_sent
+
+def confirm_bet(socket, number):
+    num_data = number.encode('utf-8')
+    num_data_size = struct.pack("!i", len(num_data))
+
+    data = OK_TYPE.encode('utf-8') 
+    data += num_data_size
+    data += num_data
+
+    assert write_all(socket, data) == len(data), "Error in confirmation, cannot write all bytes due to an error"
